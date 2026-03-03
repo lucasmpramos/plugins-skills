@@ -47,7 +47,7 @@ async function clickupFetch(
   });
   const data = (await res.json()) as Record<string, unknown>;
   if (!res.ok || data.err) {
-    throw new Error((data.err as string) || `HTTP ${res.status}`);
+    throw new Error(`${options.method ?? "GET"} ${path} → ${(data.err as string) || `HTTP ${res.status}`}`);
   }
   return data;
 }
@@ -409,18 +409,15 @@ ${actionDescriptions}`,
         }
       }
 
+      const logger = api.logger;
+      logger?.debug?.(`clickup-api: ${action}${args.listId ? ` list=${args.listId}` : ""}${args.taskId ? ` task=${args.taskId}` : ""}${args.spaceId ? ` space=${args.spaceId}` : ""}`);
       try {
         const result = await actionDef.handler(args, config);
         return { content: [{ type: "text", text: result }] };
       } catch (err) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `ClickUp error: ${err instanceof Error ? err.message : String(err)}`,
-            },
-          ],
-        };
+        const msg = err instanceof Error ? err.message : String(err);
+        logger?.error?.(`clickup-api: ${action} failed — ${msg}`);
+        return { content: [{ type: "text", text: `ClickUp error: ${msg}` }] };
       }
     },
   };
