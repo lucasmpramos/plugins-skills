@@ -202,13 +202,14 @@ const ACTIONS: Record<string, { desc: string; required?: string[]; handler: Acti
   },
 
   getTask: {
-    desc: "Get full details of a task. Args: taskId, includeComments(optional bool, default false)",
+    desc: "Get full details of a task. Args: taskId, includeComments(optional bool, default false), includeSubtasks(optional bool, default true)",
     required: ["taskId"],
     handler: async (args, config) => {
-      const data = (await clickupFetch(`/task/${args.taskId}`, config.apiKey)) as Record<
-        string,
-        unknown
-      >;
+      const includeSubtasks = args.includeSubtasks !== false;
+      const data = (await clickupFetch(
+        `/task/${args.taskId}?include_subtasks=${includeSubtasks}`,
+        config.apiKey,
+      )) as Record<string, unknown>;
       const t = data as Record<string, unknown>;
       const id = (t.custom_id as string) || (t.id as string);
       const status = ((t.status as Record<string, unknown>)?.status as string) || "—";
@@ -220,14 +221,26 @@ const ACTIONS: Record<string, { desc: string; required?: string[]; handler: Acti
           .map((a) => a.username || a.email)
           .join(", ") || "Unassigned";
       const due = formatDate((t.due_date as string) ? Number(t.due_date) : null);
-      const desc = (t.description as string)?.slice(0, 300) || "—";
+      const timeEst = t.time_estimate ? `${Math.round(Number(t.time_estimate) / 3600000 * 10) / 10}h` : "—";
+      const desc = (t.description as string) || "—";
 
       let out = `📌 ${t.name}\n`;
-      out += `ID: ${id} | Status: ${status} | Priority: ${priority} | Due: ${due}\n`;
+      out += `ID: ${id} | Status: ${status} | Priority: ${priority} | Due: ${due} | Estimate: ${timeEst}\n`;
       out += `Assignees: ${assignees}\n`;
       if (t.url) out += `URL: ${t.url}\n`;
       out += `\nDescription:\n${desc}`;
-      if ((t.description as string)?.length > 300) out += "…";
+
+      // Subtasks
+      const subtasks = (t.subtasks as Array<Record<string, unknown>>) || [];
+      if (subtasks.length) {
+        out += `\n\nSubtasks (${subtasks.length}):\n`;
+        for (const s of subtasks) {
+          const sid = (s.custom_id as string) || (s.id as string);
+          const sstatus = ((s.status as Record<string, unknown>)?.status as string) || "—";
+          const sest = s.time_estimate ? `${Math.round(Number(s.time_estimate) / 3600000 * 10) / 10}h` : "—";
+          out += `  [${sid}] ${s.name} · ${sstatus} · est: ${sest}\n`;
+        }
+      }
 
       if (args.includeComments) {
         try {
