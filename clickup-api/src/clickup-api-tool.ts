@@ -255,16 +255,25 @@ const ACTIONS: Record<string, { desc: string; required?: string[]; handler: Acti
   },
 
   createTask: {
-    desc: "Create a task in a list. Args: listId, name, description(optional), status(optional), priority(optional 1-4), due_date(optional timestamp ms), assignees(optional array of user IDs), time_estimate(optional integer ms)",
+    desc: "Create a task in a list. Args: listId, name, description(optional), markdown_content(optional markdown description), status(optional), priority(optional 1-4), due_date(optional timestamp ms), due_date_time(optional bool), start_date(optional timestamp ms), start_date_time(optional bool), assignees(optional array of user IDs), time_estimate(optional integer ms), tags(optional array of strings), points(optional sprint points), notify_all(optional bool), parent(optional task ID for subtask), links_to(optional task ID to link)",
     required: ["listId", "name"],
     handler: async (args, config) => {
       const body: Record<string, unknown> = { name: args.name };
       if (args.description) body.description = args.description;
+      if (args.markdown_content) body.markdown_content = args.markdown_content;
       if (args.status) body.status = args.status;
-      if (args.priority) body.priority = Number(args.priority);
-      if (args.due_date) body.due_date = String(args.due_date);
+      if (args.priority != null) body.priority = Number(args.priority);
+      if (args.due_date != null) body.due_date = Number(args.due_date);
+      if (args.due_date_time != null) body.due_date_time = Boolean(args.due_date_time);
+      if (args.start_date != null) body.start_date = Number(args.start_date);
+      if (args.start_date_time != null) body.start_date_time = Boolean(args.start_date_time);
       if (args.time_estimate != null) body.time_estimate = Number(args.time_estimate);
-      if (Array.isArray(args.assignees)) body.assignees = args.assignees;
+      if (Array.isArray(args.assignees)) body.assignees = args.assignees.map(Number);
+      if (Array.isArray(args.tags)) body.tags = args.tags;
+      if (args.points != null) body.points = Number(args.points);
+      if (args.notify_all != null) body.notify_all = Boolean(args.notify_all);
+      if (args.parent) body.parent = String(args.parent);
+      if (args.links_to) body.links_to = String(args.links_to);
 
       const data = (await clickupFetch(`/list/${args.listId}/task`, config.apiKey, {
         method: "POST",
@@ -277,18 +286,32 @@ const ACTIONS: Record<string, { desc: string; required?: string[]; handler: Acti
   },
 
   updateTask: {
-    desc: "Update a task. Args: taskId, name(optional), description(optional), status(optional), priority(optional 1-4), due_date(optional timestamp ms), assignees(optional array), time_estimate(optional integer ms)",
+    desc: "Update a task. Args: taskId, name(optional), description(optional), markdown_content(optional markdown description), status(optional), priority(optional 1-4), due_date(optional timestamp ms), due_date_time(optional bool), start_date(optional timestamp ms), start_date_time(optional bool), assignees(optional object {add:[userId], rem:[userId]}), time_estimate(optional integer ms), points(optional sprint points), parent(optional task ID to move subtask), archived(optional bool)",
     required: ["taskId"],
     handler: async (args, config) => {
       const { taskId, ...fields } = args;
       const body: Record<string, unknown> = {};
       if (fields.name) body.name = fields.name;
       if (fields.description) body.description = fields.description;
+      if (fields.markdown_content) body.markdown_content = fields.markdown_content;
       if (fields.status) body.status = fields.status;
-      if (fields.priority) body.priority = Number(fields.priority);
-      if (fields.due_date) body.due_date = String(fields.due_date);
+      if (fields.priority != null) body.priority = Number(fields.priority);
+      if (fields.due_date != null) body.due_date = Number(fields.due_date);
+      if (fields.due_date_time != null) body.due_date_time = Boolean(fields.due_date_time);
+      if (fields.start_date != null) body.start_date = Number(fields.start_date);
+      if (fields.start_date_time != null) body.start_date_time = Boolean(fields.start_date_time);
       if (fields.time_estimate != null) body.time_estimate = Number(fields.time_estimate);
-      if (Array.isArray(fields.assignees)) body.assignees = fields.assignees;
+      if (fields.points != null) body.points = Number(fields.points);
+      if (fields.parent) body.parent = String(fields.parent);
+      if (fields.archived != null) body.archived = Boolean(fields.archived);
+      // assignees for updateTask uses {add: [userId], rem: [userId]} format (not a plain array)
+      if (fields.assignees && typeof fields.assignees === "object" && !Array.isArray(fields.assignees)) {
+        const a = fields.assignees as Record<string, unknown>;
+        body.assignees = {
+          add: Array.isArray(a.add) ? (a.add as unknown[]).map(Number) : [],
+          rem: Array.isArray(a.rem) ? (a.rem as unknown[]).map(Number) : [],
+        };
+      }
 
       const data = (await clickupFetch(`/task/${taskId}`, config.apiKey, {
         method: "PUT",
