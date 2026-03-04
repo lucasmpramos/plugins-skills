@@ -255,7 +255,7 @@ const ACTIONS: Record<string, { desc: string; required?: string[]; handler: Acti
   },
 
   createTask: {
-    desc: "Create a task in a list. Args: listId, name, description(optional), status(optional), priority(optional 1-4), due_date(optional timestamp ms), assignees(optional array of user IDs)",
+    desc: "Create a task in a list. Args: listId, name, description(optional), status(optional), priority(optional 1-4), due_date(optional timestamp ms), assignees(optional array of user IDs), time_estimate(optional integer ms)",
     required: ["listId", "name"],
     handler: async (args, config) => {
       const body: Record<string, unknown> = { name: args.name };
@@ -263,6 +263,7 @@ const ACTIONS: Record<string, { desc: string; required?: string[]; handler: Acti
       if (args.status) body.status = args.status;
       if (args.priority) body.priority = Number(args.priority);
       if (args.due_date) body.due_date = String(args.due_date);
+      if (args.time_estimate != null) body.time_estimate = Number(args.time_estimate);
       if (Array.isArray(args.assignees)) body.assignees = args.assignees;
 
       const data = (await clickupFetch(`/list/${args.listId}/task`, config.apiKey, {
@@ -276,7 +277,7 @@ const ACTIONS: Record<string, { desc: string; required?: string[]; handler: Acti
   },
 
   updateTask: {
-    desc: "Update a task. Args: taskId, name(optional), description(optional), status(optional), priority(optional 1-4), due_date(optional timestamp ms), assignees(optional array)",
+    desc: "Update a task. Args: taskId, name(optional), description(optional), status(optional), priority(optional 1-4), due_date(optional timestamp ms), assignees(optional array), time_estimate(optional integer ms)",
     required: ["taskId"],
     handler: async (args, config) => {
       const { taskId, ...fields } = args;
@@ -286,6 +287,7 @@ const ACTIONS: Record<string, { desc: string; required?: string[]; handler: Acti
       if (fields.status) body.status = fields.status;
       if (fields.priority) body.priority = Number(fields.priority);
       if (fields.due_date) body.due_date = String(fields.due_date);
+      if (fields.time_estimate != null) body.time_estimate = Number(fields.time_estimate);
       if (Array.isArray(fields.assignees)) body.assignees = fields.assignees;
 
       const data = (await clickupFetch(`/task/${taskId}`, config.apiKey, {
