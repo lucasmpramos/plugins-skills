@@ -25,29 +25,75 @@ GOG_ACCOUNT = "lucasmpramos@gmail.com"
 
 env = {**os.environ, "GOG_ACCOUNT": GOG_ACCOUNT}
 
-# Category mapping: Transaction Sheet category → (DRE category, Income or Expenses tab)
+# Category mapping: Transaction Sheet category → DRE category
+# All expenses map to one of: Salaries & Contractors, Revenue Share, Software & Tools,
+# Marketing, Office & Admin, Taxes, Bank Fees, Thor Personal, Other Expense
+# All income maps to: Retainer, Project, Other Income
 CATEGORY_MAP = {
-    # Income
-    'Transfer': ('Other Income', 'Income'),
-    'Collection': ('Other Income', 'Income'),
-    # Salaries
-    'Payroll Service': ('Salaries & Contractors', 'Expenses'),
-    # Software
-    'Software': ('Software & Tools', 'Expenses'),
-    'Software — Design': ('Software & Tools', 'Expenses'),
-    # Bank / Loan
-    'Bank Fee': ('Bank Fees', 'Expenses'),
-    'Loan Payment': ('Bank Fees', 'Expenses'),
-    'Overdraft interest': ('Bank Fees', 'Expenses'),
-    'Service fee': ('Bank Fees', 'Expenses'),
-    # Office
-    'Insurance': ('Office & Admin', 'Expenses'),
-    'Pension Fund': ('Office & Admin', 'Expenses'),
-    # Special
-    'Thor Personal': ('Thor Personal', 'Expenses'),
-    # Fallback
-    'Uncategorized': ('Other Expense', 'Expenses'),
-    'Entertainment': ('Other Expense', 'Expenses'),
+    # === INCOME ===
+    'Transfer': 'Other Income',
+    'Collection': 'Other Income',
+    'Collections': 'Other Income',
+    'Income — PayPal': 'Other Income',
+    'Income—Paypal': 'Other Income',
+    'Income—PayPal': 'Other Income',
+    'Salary': 'Salaries & Contractors',  # Both income (positive) and deduction (negative)
+
+    # === SALARIES & CONTRACTORS ===
+    'Payroll Service': 'Salaries & Contractors',
+    'Professional Services': 'Salaries & Contractors',
+
+    # === SOFTWARE & TOOLS ===
+    'Software': 'Software & Tools',
+    'Software — Design': 'Software & Tools',
+    'Software — Web Dev': 'Software & Tools',
+    'Software — AI': 'Software & Tools',
+    'Software — Marketing': 'Software & Tools',
+    'Software — Invoicing': 'Software & Tools',
+    'Software (THOR)': 'Thor Personal',
+
+    # === MARKETING ===
+    'Marketing': 'Marketing',
+
+    # === OFFICE & ADMIN ===
+    'Insurance': 'Office & Admin',
+    'Pension Fund': 'Office & Admin',
+    'Pension/Tax': 'Taxes',
+    'Rent': 'Office & Admin',
+    'Rent / Property': 'Office & Admin',
+    'Legal': 'Office & Admin',
+    'Membership': 'Office & Admin',
+    'Telecom': 'Office & Admin',
+
+    # === TAXES ===
+    'Tax / Government': 'Taxes',
+
+    # === BANK FEES ===
+    'Bank Fee': 'Bank Fees',
+    'Loan Payment': 'Bank Fees',
+    'Overdraft interest': 'Bank Fees',
+    'Service fee': 'Bank Fees',
+
+    # === THOR PERSONAL ===
+    'Thor Personal': 'Thor Personal',
+    'Food & Dining': 'Thor Personal',
+    'Groceries': 'Thor Personal',
+    'Transport — Fuel': 'Thor Personal',
+    'Transport—Fuel': 'Thor Personal',
+    'Transport — Ride': 'Thor Personal',
+    'Transport — Parking': 'Thor Personal',
+    'Transport—Parking': 'Thor Personal',
+    'Transport — Taxi': 'Thor Personal',
+    'Transport — Vehicle': 'Thor Personal',
+    'Transport — Gov': 'Thor Personal',
+    'Transport — Flight': 'Thor Personal',
+    'Travel': 'Thor Personal',
+    'Fitness': 'Thor Personal',
+    'Entertainment': 'Thor Personal',
+    'Leisure': 'Thor Personal',
+    'Electronics / Retail': 'Thor Personal',
+    'Retail': 'Thor Personal',
+    'Uncategorized': 'Other Expense',
 }
 
 # DRE category list (for validation)
@@ -89,11 +135,15 @@ def make_dre_key(date_str, payee, amount):
 
 
 def parse_date(date_str):
-    """Parse various date formats to DD/MM/YYYY."""
+    """Parse various date formats to 'Month Day, Year' for Sheets compatibility.
+    
+    Sheets locale can misinterpret DD/MM/YYYY or YYYY-MM-DD.
+    'March 31, 2026' format is unambiguous and auto-converts to date values.
+    """
     date_str = str(date_str).strip()
     for fmt in ('%d.%m.%Y', '%d/%m/%Y', '%Y-%m-%d'):
         try:
-            return datetime.strptime(date_str, fmt).strftime('%d/%m/%Y')
+            return datetime.strptime(date_str, fmt).strftime('%B %d, %Y')
         except ValueError:
             continue
     return date_str
@@ -152,22 +202,19 @@ def update_dre(dry_run=False):
         except ValueError:
             continue
 
-        # Determine direction
-        if amount > 0:
-            # Income — use description as client
-            dre_cat = 'Other Income'  # Default for positive amounts
+        # Map category
+        dre_cat = CATEGORY_MAP.get(category)
+        if not dre_cat:
+            unmapped.append((date, description, category, amount))
+            dre_cat = 'Other Expense' if amount < 0 else 'Other Income'
+
+        # Determine tab from DRE category
+        if dre_cat in INCOME_CATEGORIES or amount > 0:
             tab = 'Income'
             payee = description
             abs_amount = f"${amount:,.2f}"
             dedup_set = income_keys
         else:
-            # Expense — map category
-            mapped = CATEGORY_MAP.get(category)
-            if not mapped:
-                unmapped.append((date, description, category, amount))
-                dre_cat = 'Other Expense'
-            else:
-                dre_cat = mapped[0]
             tab = 'Expenses'
             payee = description
             abs_amount = f"${abs(amount):,.2f}"
