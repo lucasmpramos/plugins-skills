@@ -117,6 +117,18 @@
 |-------------|----------|
 | AKTU TAKTU * | Food & Dining |
 
+### Uncategorized (awaiting review)
+| Description | Category |
+|-------------|----------|
+| DONE ehf. | Uncategorized — verify with Luke |
+
+### Banking Fees
+| Description | Category |
+|-------------|----------|
+| Færslugjöld | Bank Fee |
+| Útvextir | Overdraft interest |
+| PRO BUSINESS MONTHLY | Software |
+
 ## Default
 
 Any description not matching above → **Uncategorized** (flag for Luke's review).
